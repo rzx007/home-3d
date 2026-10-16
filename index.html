@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>73㎡ 两室一厅 · 第二间房的三种答案 | Three.js 交互式家装</title>
+  <meta name="description"
+    content="73㎡ 两室一厅户型的交互式 3D 家装：同一户型给出'在家工作 / 朋友留宿 / 留给未来'三种第二间房方案，一键切换整屋家具布局；dollhouse 立体剖视、正交俯视、1.35m 剖切图与第一人称漫游四种视角。" />
+  <link rel="stylesheet" href="./styles.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='3' fill='%23f4f1ea'/%3E%3Cpath d='M4 6h11v20H4z' fill='%23d8c3a2'/%3E%3Cpath d='M17 6h11v20H17z' fill='%237c8a76'/%3E%3C/svg%3E" />
+  <script>
+    // 早期错误捕获（模块依赖在顶层抛错时也能显示出来）
+    (function () {
+      function show(kind, msg, extra) {
+        try {
+          var b = document.getElementById('boot') || document.body;
+          var box = document.getElementById('boot-error');
+          if (!box) {
+            box = document.createElement('div');
+            box.id = 'boot-error';
+            box.className = 'err';
+            box.style.cssText = 'position:fixed;left:24px;bottom:24px;max-width:min(720px,80vw);z-index:99;font:11.5px/1.55 ui-monospace,Consolas,monospace;color:#8a3b2e;background:#fdf3f0;border:1px solid #eccdc4;border-radius:4px;padding:10px 12px;white-space:pre-wrap;box-shadow:0 6px 22px rgba(51,49,44,.12)';
+            document.body.appendChild(box);
+          }
+          box.textContent = '[' + kind + '] ' + msg + (extra ? '\n' + extra : '');
+          document.documentElement.setAttribute('data-error', kind + ': ' + msg);
+        } catch (e) { /* ignore */ }
+      }
+      window.__showErr = show;
+      window.addEventListener('error', function (e) {
+        show('error', e.message || String(e.error),
+          (e.error && e.error.stack) || (e.filename ? e.filename + ':' + e.lineno : ''));
+      });
+      window.addEventListener('unhandledrejection', function (e) {
+        var r = e.reason;
+        show('promise', (r && r.message) || String(r), (r && r.stack) || '');
+      });
+    })();
+  </script>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three/three.module.js",
+      "three/addons/": "./vendor/three/addons/"
+    }
+  }
+  </script>
+</head>
+
+<body>
+  <div id="app">
+    <canvas id="view"></canvas>
+
+    <!-- ============================ HUD ============================ -->
+    <div id="hud" aria-hidden="true">
+
+      <!-- 顶栏：标题 + 方案切换 + 视角切换 -->
+      <header class="topbar">
+        <div class="brand">
+          <span class="mark" aria-hidden="true"></span>
+          <div class="brand-text">
+            <h1>73㎡ 两室一厅 · 第二间房的三种答案</h1>
+            <p>套内 62.56 ㎡ <i></i> 建筑 73.0 ㎡ <i></i> 层高 2.75 m <i></i> 浅橡木 / 暖白 / 灰绿</p>
+          </div>
+        </div>
+
+        <div class="switch-group" role="tablist" aria-label="第二间房方案">
+          <span class="switch-label">第二间房</span>
+          <div class="segmented" id="layout-switch"></div>
+        </div>
+
+        <div class="switch-group" role="tablist" aria-label="视角">
+          <span class="switch-label">视角</span>
+          <div class="segmented" id="view-switch"></div>
+        </div>
+
+        <div class="switch-group toggles" aria-label="显示选项">
+          <label class="chk"><input type="checkbox" id="opt-labels" checked><span>房间标签</span></label>
+          <label class="chk"><input type="checkbox" id="opt-lamp-shadow" checked><span>灯光阴影</span></label>
+          <label class="chk"><input type="checkbox" id="opt-glb"><span>GLB 资产</span></label>
+        </div>
+      </header>
+
+      <!-- 左：房间清单 -->
+      <aside class="panel panel-left" id="room-list" aria-label="房间清单">
+        <div class="panel-head">
+          <h2>户型构成</h2>
+          <span class="meta" id="area-net">套内 62.56 ㎡</span>
+        </div>
+        <ul class="rooms" id="room-items"></ul>
+        <div class="panel-foot">
+          <span id="asset-status">程序化建模 32 件</span>
+        </div>
+      </aside>
+
+      <!-- 右：房间卡片 -->
+      <aside class="panel panel-right" id="room-card" aria-label="房间详情">
+        <div class="empty" id="card-empty">
+          <strong>点一下任意房间</strong>
+          <span>查看开间尺寸、面积、门窗与家具清单</span>
+        </div>
+        <div class="card-body" id="card-body" hidden></div>
+      </aside>
+
+      <!-- 右下：迷你地图 -->
+      <div class="panel minimap-wrap" id="minimap-wrap">
+        <canvas id="minimap" width="360" height="270"></canvas>
+        <div class="minimap-tag" id="minimap-tag">正交俯视</div>
+      </div>
+
+      <!-- 底部中央：时间滑杆 -->
+      <div class="panel timebar">
+        <div class="time-now">
+          <span class="clock" id="time-clock">10:00</span>
+          <span class="phase" id="time-phase">上午</span>
+        </div>
+        <input type="range" id="time-slider" min="0" max="1439" step="1" value="600"
+          aria-label="一天中的时间" />
+        <div class="time-presets" id="time-presets"></div>
+      </div>
+
+      <!-- 左下：操作提示 -->
+      <div class="hintbar" id="hintbar">
+        <span class="dot" aria-hidden="true"></span>
+        <span id="hint-text">拖动旋转 · 滚轮缩放 · 单击房间查看面积与家具</span>
+      </div>
+
+      <!-- 漫游准心 -->
+      <div id="crosshair" aria-hidden="true"></div>
+    </div>
+
+    <!-- ========================== 开场动画 ========================== -->
+    <div id="intro">
+      <div class="intro-inner">
+        <p class="intro-kicker">程序化建模 · 无外部资源 · Three.js</p>
+        <h2 class="intro-title">先有户型图，<br />再有一整个家</h2>
+        <p class="intro-sub" id="intro-step">正在描出户型图…</p>
+        <div class="intro-bar"><i id="intro-progress"></i></div>
+        <button id="intro-skip" type="button">跳过开场</button>
+      </div>
+    </div>
+
+    <!-- ========================== 加载/错误 ========================== -->
+    <div id="boot">
+      <div class="boot-inner">
+        <span class="spinner" aria-hidden="true"></span>
+        <p id="boot-text">正在生成程序化木纹 / 布艺 / 石材贴图…</p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+
+</html>

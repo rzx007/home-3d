@@ -1,0 +1,10 @@
+﻿{
+  "name": "73m2-two-bedroom-3d",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "73㎡ 两室一厅交互式 3D 家装（Three.js，程序化建模 + 可选 Blender GLB 资产）",
+  "scripts": {
+    "serve": "npx --yes serve -l 8181 ."
+  }
+}

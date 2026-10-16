@@ -1,0 +1,7 @@
+{
+  "present": false,
+  "generated": [],
+  "count": 0,
+  "note": "占位文件。运行 blender/build_assets.py 批量导出 32 件 GLB 后，该文件会被脚本重写为 present=true 并列出实际生成的文件名，前端检测到后即可用 GLB 替换程序化家具（顶部开关「GLB 资产」）。",
+  "spec": "见 src/assets.js 的 ASSET_MANIFEST（32 件，含中文名与目标尺寸，单位米）"
+}
